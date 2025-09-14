@@ -7,7 +7,7 @@ export async function POST (req: Request) {
   try {
     const body = await req.json()
     const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`
-    const filePath = path.join('/tmp', 'orders.json')
+    const filePath = path.join(process.cwd(), 'orders.json')
 
     // 1️⃣ Read existing orders if file exists
     let orders: any[] = []
