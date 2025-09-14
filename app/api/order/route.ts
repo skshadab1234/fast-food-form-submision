@@ -39,12 +39,16 @@ export async function POST (req: Request) {
       screenshotPathTmp = path.join(tmpUploadDir, tmpFileName)
       await writeFile(screenshotPathTmp, buffer)
 
-      // ✅ Save screenshot in app/uploads (local/root safe)
-      const rootUploadDir = path.join(process.cwd(), 'app', 'uploads')
-      await mkdir(rootUploadDir, { recursive: true })
-      const rootFileName = `${uuidv4()}-${screenshot.name}`
-      screenshotPathRoot = path.join(rootUploadDir, rootFileName)
-      await writeFile(screenshotPathRoot, buffer)
+      // ✅ Save screenshot in app/uploads (root/local) if writeable
+      try {
+        const rootUploadDir = path.join(process.cwd(), 'app', 'uploads')
+        await mkdir(rootUploadDir, { recursive: true })
+        const rootFileName = `${uuidv4()}-${screenshot.name}`
+        screenshotPathRoot = path.join(rootUploadDir, rootFileName)
+        await writeFile(screenshotPathRoot, buffer)
+      } catch {
+        console.warn('⚠️ Root upload not writeable (likely serverless)')
+      }
 
       screenshotFileName = screenshot.name
     }
@@ -52,8 +56,8 @@ export async function POST (req: Request) {
     const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`
 
     // ✅ Paths for orders.json
-    const tmpOrdersPath = path.join('/tmp', 'orders.json') // serverless safe
-    const rootOrdersPath = path.join(process.cwd(), 'orders.json') // local/project root
+    const tmpOrdersPath = path.join('/tmp', 'orders.json')
+    const rootOrdersPath = path.join(process.cwd(), 'orders.json')
 
     // Read existing orders from tmp
     let existingOrders: any[] = []
@@ -74,31 +78,27 @@ export async function POST (req: Request) {
       txnId: txnId || '-',
       items: orders.map((i: any) => `${i.name} × ${i.quantity} — ₹${i.total}`),
       total: totalAmount,
-      date: new Date().toLocaleString('en-IN', { hour12: true }),
-      screenshotPath: screenshotPathRoot
+      date: new Date().toLocaleString('en-IN', { hour12: true })
     }
 
     existingOrders.push(newOrder)
 
-    // ✅ Write orders.json to tmp
+    // ✅ Write orders.json to tmp (always safe)
     await writeFile(
       tmpOrdersPath,
       JSON.stringify(existingOrders, null, 2),
       'utf-8'
     )
 
-    // ✅ Write orders.json to root
+    // ✅ Write orders.json to root/local if possible
     try {
       await writeFile(
         rootOrdersPath,
         JSON.stringify(existingOrders, null, 2),
         'utf-8'
       )
-    } catch (err) {
-      console.warn(
-        '⚠️ Could not write to root orders.json (likely read-only in serverless)',
-        err
-      )
+    } catch {
+      console.warn('⚠️ Root orders.json not writeable (likely serverless)')
     }
 
     // ✅ Mail setup
@@ -135,7 +135,7 @@ export async function POST (req: Request) {
     if (screenshotPathTmp) {
       mailOptionsAdmin.attachments.push({
         filename: screenshotFileName || 'screenshot.jpg',
-        path: screenshotPathTmp // always use tmp path for mail attachments
+        path: screenshotPathTmp
       })
     }
 
