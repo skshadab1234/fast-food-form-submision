@@ -1,428 +1,375 @@
 'use client'
 import React, { useState } from 'react'
-import {
-  Autocomplete,
-  TextField,
-  Box,
-  Typography,
-  Button,
-  Paper,
-  Divider,
-  Chip,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
-  IconButton,
-  CircularProgress,
-  Skeleton,
-  Grid
-} from '@mui/material'
-import { File, Paperclip, ShoppingBag, XIcon } from 'lucide-react'
+import { Container, Typography, Button, Divider, Box } from '@mui/material'
+import { Send } from 'lucide-react'
 
+import CustomerInfo from './form/CustomerInfo'
+import MenuSelector from './form/MenuSelector'
+import OrderSummary from './form/OrderSummary'
+import PaymentSection from './form/PaymentSelection'
+import Loader from './form/Loader'
+import Swal from 'sweetalert2'
+import Branding from './Branding'
+
+// Dummy menu data (replace with DB/API later)
 const menu = [
-  { id: 'shawarma', name: 'Shawarma', price: 120 },
-  { id: 'chicken_roll', name: 'Chicken Roll', price: 80 },
-  { id: 'paneer_roll', name: 'Paneer Roll', price: 100 },
-  { id: 'burger', name: 'Burger', price: 90 },
-  { id: 'fries', name: 'French Fries', price: 70 },
-  { id: 'coke', name: 'Coke (500ml)', price: 40 }
+  {
+    label: 'Momos',
+    items: [
+      { id: 'steamed_momos_s', name: 'Steamed Momos (Small)', price: 50 },
+      { id: 'steamed_momos_l', name: 'Steamed Momos (Large)', price: 90 },
+      { id: 'fried_momos_s', name: 'Fried Momos (Small)', price: 60 },
+      { id: 'fried_momos_l', name: 'Fried Momos (Large)', price: 110 },
+      { id: 'kurkure_momos_s', name: 'Kurkure Momos (Small)', price: 90 },
+      { id: 'kurkure_momos_l', name: 'Kurkure Momos (Large)', price: 170 },
+      { id: 'chilly_momos_s', name: 'Chilly Momos (Small)', price: 90 },
+      { id: 'chilly_momos_l', name: 'Chilly Momos (Large)', price: 170 },
+      { id: 'crispy_momos_s', name: 'Crispy Momos (Small)', price: 90 },
+      { id: 'crispy_momos_l', name: 'Crispy Momos (Large)', price: 170 },
+      { id: 'barra_momos', name: 'Barra Momos', price: 220 }
+    ]
+  },
+  {
+    label: 'Maggie',
+    items: [
+      { id: 'plain_maggie', name: 'Plain Maggie', price: 40 },
+      { id: 'veg_maggie', name: 'Veg Maggie', price: 50 },
+      { id: 'cheesy_maggie', name: 'Cheesy Maggie', price: 60 }
+    ]
+  },
+  {
+    label: 'Fries',
+    items: [
+      { id: 'french_fries', name: 'French Fries', price: 70 },
+      { id: 'peri_peri_fries', name: 'Peri-peri Fries', price: 90 },
+      { id: 'cheesy_fries', name: 'Cheesy Fries', price: 110 }
+    ]
+  },
+  {
+    label: 'Burgers',
+    items: [
+      { id: 'chicken_burger', name: 'Chicken Burger', price: 60 },
+      { id: 'maharaja_burger', name: 'Maharaja Burger', price: 110 }
+    ]
+  },
+  {
+    label: 'Shawarma',
+    items: [
+      { id: 'chicken_shawarma', name: 'Chicken Shawarma', price: 70 },
+      { id: 'cheese_shawarma', name: 'Cheese Shawarma', price: 90 },
+      { id: 'loaded_shawarma', name: 'Loaded Shawarma', price: 110 }
+    ]
+  },
+  {
+    label: 'Waffles',
+    items: [
+      { id: 'chocolate_waffle', name: 'Chocolate Waffle', price: 60 },
+      { id: 'white_waffle', name: 'White Waffle', price: 60 },
+      { id: 'nutella_waffle', name: 'Nutella Waffle', price: 80 }
+    ]
+  },
+  {
+    label: 'Chinese',
+    items: [
+      { id: 'chinese_bhel', name: 'Chinese Bhel', price: 20 },
+      { id: 'chinese_manchurian', name: 'Chinese Manchurian', price: 20 },
+      { id: 'cheesy_chinese_bhel', name: 'Cheesy Chinese Bhel', price: 40 }
+    ]
+  },
+  {
+    label: 'Chicken Lollipop Fry',
+    items: [
+      {
+        id: 'lollipop_fry_250',
+        name: 'Chicken Lollipop Fry 250gm (4 pcs)',
+        price: 80
+      },
+      {
+        id: 'lollipop_fry_500',
+        name: 'Chicken Lollipop Fry 500gm (8 pcs)',
+        price: 160
+      },
+      {
+        id: 'lollipop_fry_1kg',
+        name: 'Chicken Lollipop Fry 1kg (16 pcs)',
+        price: 320
+      }
+    ]
+  },
+  {
+    label: "Creamy Chicken Lollipop (Chef's Special)",
+    items: [
+      {
+        id: 'creamy_lollipop_250',
+        name: 'Creamy Chicken Lollipop 250gm',
+        price: 150
+      },
+      {
+        id: 'creamy_lollipop_500',
+        name: 'Creamy Chicken Lollipop 500gm',
+        price: 300
+      },
+      {
+        id: 'creamy_lollipop_1kg',
+        name: 'Creamy Chicken Lollipop 1kg',
+        price: 550
+      }
+    ]
+  },
+  {
+    label: 'Chicken Lollipop Chilly Dry',
+    items: [
+      {
+        id: 'chilly_lollipop_250',
+        name: 'Chicken Lollipop Chilly Dry 250gm',
+        price: 150
+      },
+      {
+        id: 'chilly_lollipop_500',
+        name: 'Chicken Lollipop Chilly Dry 500gm',
+        price: 300
+      },
+      {
+        id: 'chilly_lollipop_1kg',
+        name: 'Chicken Lollipop Chilly Dry 1kg',
+        price: 550
+      }
+    ]
+  }
 ]
 
 export default function OrderForm () {
-  const [selectedItem, setSelectedItem] = useState<any | null>(null)
-  const [quantity, setQuantity] = useState(1)
-  const [orders, setOrders] = useState<any[]>([])
+  // Customer states
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
-  const [paymentMode, setPaymentMode] = useState('COD')
-  const [txnId, setTxnId] = useState('')
-  const [adding, setAdding] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [instructions, setInstructions] = useState('')
   const [address, setAddress] = useState('')
 
-  // ✅ Validation regex
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  // Menu & orders
+  const [selectedItem, setSelectedItem] = useState<any>(null)
+  const [quantity, setQuantity] = useState(1)
+  const [orders, setOrders] = useState<any[]>([])
+
+  // Payment
+  const [paymentMode, setPaymentMode] = useState('COD')
+  const [txnId, setTxnId] = useState('')
+  const [screenshot, setScreenshot] = useState<File | null>(null)
+
+  // Loader
+  const [loading, setLoading] = useState(false)
+
+  // Validation regex
+  const nameRegex = /^[A-Za-z ]{2,30}$/
   const phoneRegex = /^[0-9]{10,15}$/
-  const nameRegex = /^[A-Za-z\s]{2,30}$/
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+  // Format currency
+  const formatCurrency = (value: number) => `₹${value.toFixed(2)}`
+
+  // Add item
   const handleAddItem = () => {
-    if (selectedItem && quantity > 0) {
-      setAdding(true)
-      setTimeout(() => {
-        const existing = orders.find(o => o.id === selectedItem.id)
-        if (existing) {
-          setOrders(prev =>
-            prev.map(o =>
-              o.id === selectedItem.id
-                ? {
-                    ...o,
-                    quantity: o.quantity + quantity,
-                    total: o.price * (o.quantity + quantity)
-                  }
-                : o
-            )
-          )
-        } else {
-          setOrders(prev => [
-            ...prev,
-            { ...selectedItem, quantity, total: selectedItem.price * quantity }
-          ])
+    if (!selectedItem) return
+    const existing = orders.find(o => o.id === selectedItem.id)
+    if (existing) {
+      existing.quantity += quantity
+      existing.total = existing.quantity * existing.price
+      setOrders([...orders])
+    } else {
+      setOrders([
+        ...orders,
+        {
+          ...selectedItem,
+          quantity,
+          total: selectedItem.price * quantity
         }
-        setSelectedItem(null)
-        setQuantity(1)
-        setAdding(false)
-      }, 700)
+      ])
     }
+    setSelectedItem(null)
+    setQuantity(1)
   }
 
-  const handleRemove = (id: string) => {
-    setOrders(prev => prev.filter(item => item.id !== id))
+  // Remove item
+  const handleRemove = (id: number) => {
+    setOrders(orders.filter(o => o.id !== id))
   }
 
-  const totalAmount = orders.reduce((sum, item) => sum + item.total, 0)
+  const totalAmount = orders.reduce((sum, o) => sum + o.total, 0)
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  // Submit order
+  const handleSubmit = async () => {
+    // ✅ Basic Validations
+    if (
+      !nameRegex.test(name) ||
+      !phoneRegex.test(phone) ||
+      !emailRegex.test(email) ||
+      !address
+    ) {
+      Swal.fire({
+        icon: 'error',
+        title: '❌ Invalid Details',
+        text: 'Please fill all details correctly!'
+      })
+      return
+    }
 
-    // ✅ Validation checks
-    if (!nameRegex.test(name)) {
-      alert('⚠️ Please enter a valid name (letters only, min 2 chars).')
+    if (orders.length === 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: '❌ No Items',
+        text: 'Please add at least one item to your order.'
+      })
       return
     }
-    if (!phoneRegex.test(phone)) {
-      alert('⚠️ Please enter a valid phone number (10–15 digits).')
-      return
-    }
-    if (!emailRegex.test(email)) {
-      alert('⚠️ Please enter a valid email address.')
-      return
-    }
-    if (paymentMode === 'Online' && !txnId.trim()) {
-      alert('⚠️ Please enter Transaction ID for online payment.')
+
+    if (paymentMode === 'Online' && !txnId.trim() && !screenshot) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Payment Info Missing',
+        text: 'Please provide either Transaction ID or Screenshot for Online Payment.'
+      })
       return
     }
 
     setLoading(true)
-    setTimeout(() => {
-      const orderData = {
-        name,
-        phone,
-        email,
-        orders,
-        total: totalAmount,
-        paymentMode,
-        txnId,
-        instructions,
-        address
+
+    try {
+      // ✅ Prepare form data
+      const formData = new FormData()
+      formData.append('name', name)
+      formData.append('phone', phone)
+      formData.append('email', email)
+      formData.append('address', address)
+      formData.append('orders', JSON.stringify(orders))
+      formData.append('totalAmount', totalAmount.toString())
+      formData.append('paymentMode', paymentMode)
+      formData.append('txnId', txnId)
+
+      if (screenshot) formData.append('screenshot', screenshot)
+
+      // ✅ Send to backend
+      const res = await fetch('/api/order', { method: 'POST', body: formData })
+      const data = await res.json()
+
+      if (data.success) {
+        // ✅ Show SweetAlert with dynamic order details
+        Swal.fire({
+          icon: 'success',
+          title: 'Order Placed Successfully! ✅',
+          html: `
+            <p><b>Hi ${name}, your order is now being packed! 🍔🚀</b></p>
+            <p><b>Items Ordered:</b></p>
+            <ul>
+              ${orders
+                .map(o => `<li>${o.name} × ${o.quantity} — ₹${o.total}</li>`)
+                .join('')}
+            </ul>
+            <p><b>Total Amount:</b> ₹${totalAmount}</p>
+            <p>Payment Mode: ${paymentMode}${
+            paymentMode === 'Online'
+              ? ` (Txn ID: ${txnId || 'Provided via Screenshot'})`
+              : ''
+          }</p>
+            <p>We will deliver your order soon!</p>
+          `,
+          showConfirmButton: true,
+          confirmButtonText: 'Confirm'
+        })
+
+        // ✅ Reset form
+        setName('')
+        setPhone('')
+        setEmail('')
+        setAddress('')
+        setOrders([])
+        setPaymentMode('COD')
+        setTxnId('')
+        setScreenshot(null)
+      } else {
+        Swal.fire({
+          icon: 'error',
+          title: '❌ Error',
+          text: data.error || 'Something went wrong while placing your order.'
+        })
       }
-      console.log('📩 Order Submitted:', orderData)
-
-      // call /api/order
-      fetch(`/api/order`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(orderData)
+    } catch (err: any) {
+      Swal.fire({
+        icon: 'error',
+        title: '⚠ Error',
+        text: err.message
       })
-        .then(res => res.json())
-        .then(data => {
-          console.log('Order placed successfully:', data)
-        })
-        .catch(error => {
-          console.error('Error placing order:', error)
-        })
-      setOrders([])
-      setName('')
-      setPhone('')
-      setEmail('')
-      setPaymentMode('COD')
-      setTxnId('')
-      setInstructions('')
-      setAddress('')
+    } finally {
       setLoading(false)
-    }, 1500)
+    }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR'
-    }).format(amount)
-  }
   return (
-    <Paper
-      elevation={4}
-      sx={{ p: 4, maxWidth: 700, mx: 'auto', borderRadius: 3, mt: 4 }}
-    >
-      {/* Fullscreen Loader */}
-      {loading && (
-        <Box
-          position='fixed'
-          top={0}
-          left={0}
-          width='100%'
-          height='100%'
-          display='flex'
-          justifyContent='center'
-          alignItems='center'
-          bgcolor='rgba(255,255,255,0.8)'
-          zIndex={2000}
-        >
-          <CircularProgress size={60} color='primary' />
-        </Box>
-      )}
+    <div>
+      {loading && <Loader onFinish={() => setLoading(false)} />}
 
-      <Typography
-        variant='h4'
-        fontWeight='bold'
-        mb={2}
-        textAlign='center'
-        color='primary'
-      >
-        🌯 Fast Food Shop — Order Form
-      </Typography>
-      <Typography
-        variant='body2'
-        textAlign='center'
-        mb={3}
-        color='text.secondary'
-      >
-        Search your favorite item, add quantity & place your order easily.
-      </Typography>
+      <Branding />
 
-      <Box
-        component='form'
-        onSubmit={handleSubmit}
-        display='flex'
-        flexDirection='column'
-        gap={3}
-      >
-        {/* Customer Info in 2 Col Grid */}
-        <div className='grid grid-cols-2 gap-4'>
-          <TextField
-            label='Customer Name'
-            variant='outlined'
-            fullWidth
-            value={name}
-            onChange={e => setName(e.target.value)}
-            required
-            error={name !== '' && !nameRegex.test(name)}
-            helperText={
-              name !== '' && !nameRegex.test(name)
-                ? 'Only letters & spaces allowed (2–30 chars)'
-                : ''
-            }
-          />
-          <TextField
-            label='Phone Number'
-            type='tel'
-            variant='outlined'
-            fullWidth
-            value={phone}
-            onChange={e => setPhone(e.target.value)}
-            required
-            error={phone !== '' && !phoneRegex.test(phone)}
-            helperText={
-              phone !== '' && !phoneRegex.test(phone)
-                ? 'Enter valid phone (10–15 digits)'
-                : ''
-            }
-          />
-          <TextField
-            label='Email Address'
-            type='email'
-            className='col-span-2'
-            variant='outlined'
-            fullWidth
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            required
-            error={email !== '' && !emailRegex.test(email)}
-            helperText={
-              email !== '' && !emailRegex.test(email)
-                ? 'Enter valid email (e.g. abc@gmail.com)'
-                : ''
-            }
-          />
-          <TextField
-            label='Delivery Address'
-            multiline
-            rows={3}
-            className='col-span-2'
-            variant='outlined'
-            fullWidth
-            value={address}
-            onChange={e => setAddress(e.target.value)}
-            required
-            placeholder='Enter your local delivery address (e.g. Near City Mall, Thane)'
-          />
-        </div>
+      {/* Customer Info */}
+      <CustomerInfo
+        name={name}
+        setName={setName}
+        phone={phone}
+        setPhone={setPhone}
+        email={email}
+        setEmail={setEmail}
+        address={address}
+        setAddress={setAddress}
+        nameRegex={nameRegex}
+        phoneRegex={phoneRegex}
+        emailRegex={emailRegex}
+      />
 
-        {/* Item Selector */}
-        <Box display='flex' gap={2} alignItems='center'>
-          <Autocomplete
-            options={menu}
-            getOptionLabel={option => option.name}
-            value={selectedItem}
-            onChange={(_, newValue) => setSelectedItem(newValue)}
-            renderInput={params => (
-              <TextField {...params} label='Search Item' />
-            )}
-            renderOption={(props, option) => (
-              <Box
-                component='li'
-                {...props}
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  width: '100%'
-                }}
-              >
-                <div className='flex justify-between w-full'>
-                  <Typography>{option.name}</Typography>
-                  <Typography color='text.secondary' fontWeight='bold'>
-                    {formatCurrency(option.price)}
-                  </Typography>
-                </div>
-              </Box>
-            )}
-            sx={{ flex: 1 }}
-          />
+      <Divider sx={{ my: 3 }} />
 
-          <TextField
-            label='Qty'
-            type='number'
-            value={quantity}
-            onChange={e => {
-              // and more than 10
-              if (Number(e.target.value) > 0 && Number(e.target.value) <= 10) {
-                setQuantity(Number(e.target.value))
-              }
-            }}
-            inputProps={{ min: 1 }}
-            sx={{ width: 100 }}
-          />
+      {/* Menu Selector */}
+      <MenuSelector
+        menu={menu}
+        selectedItem={selectedItem}
+        setSelectedItem={setSelectedItem}
+        quantity={quantity}
+        setQuantity={setQuantity}
+        handleAddItem={handleAddItem}
+        formatCurrency={formatCurrency}
+      />
 
-          <Button variant='contained' color='secondary' onClick={handleAddItem}>
-            Add
-          </Button>
-        </Box>
+      {/* Order Summary */}
+      <OrderSummary
+        orders={orders}
+        handleRemove={handleRemove}
+        totalAmount={totalAmount}
+        formatCurrency={formatCurrency}
+      />
 
-        {/* Order Summary */}
-        {adding ? (
-          <Box mt={3}>
-            <Skeleton variant='rectangular' height={60} sx={{ mb: 1 }} />
-            <Skeleton variant='rectangular' height={60} sx={{ mb: 1 }} />
-          </Box>
-        ) : orders.length > 0 ? (
-          <Box mt={3}>
-            <Typography
-              variant='h6'
-              gutterBottom
-              className='flex gap-2 items-center'
-            >
-              <File /> Order Summary
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-            {orders.map(item => (
-              <Box
-                key={item.id}
-                display='flex'
-                justifyContent='space-between'
-                alignItems='center'
-                mb={1}
-                p={1.2}
-                sx={{ bgcolor: 'grey.100', borderRadius: 2 }}
-              >
-                <Box>
-                  <Typography>
-                    {item.name} × {item.quantity}
-                  </Typography>
-                  <Chip
-                    label={`${formatCurrency(item.total)}`}
-                    size='small'
-                    color='success'
-                  />
-                </Box>
-                <IconButton color='error' onClick={() => handleRemove(item.id)}>
-                  <XIcon />
-                </IconButton>
-              </Box>
-            ))}
-            <Divider sx={{ mt: 2, mb: 2 }} />
-            <Typography variant='h6' fontWeight='bold' textAlign='right'>
-              Total: {formatCurrency(totalAmount)}
-            </Typography>
-          </Box>
-        ) : null}
+      <Divider sx={{ my: 3 }} />
 
-        {orders?.length > 0 && (
-          <TextField
-            label='Special Instructions'
-            multiline
-            rows={3}
-            placeholder='e.g. Spicy jada karna, extra cheese dalna...'
-            variant='outlined'
-            fullWidth
-            value={instructions}
-            onChange={e => setInstructions(e.target.value)}
-          />
-        )}
+      {/* Payment Section */}
+      <PaymentSection
+        paymentMode={paymentMode}
+        setPaymentMode={setPaymentMode}
+        txnId={txnId}
+        setTxnId={setTxnId}
+        screenshot={screenshot}
+        setScreenshot={setScreenshot}
+      />
 
-        {/* Payment Mode */}
-        <FormControl fullWidth>
-          <InputLabel>Payment Mode</InputLabel>
-          <Select
-            value={paymentMode}
-            label='Payment Mode'
-            onChange={e => setPaymentMode(e.target.value)}
-          >
-            <MenuItem value='COD'>Cash on Delivery</MenuItem>
-            <MenuItem value='Online'>Online Payment</MenuItem>
-          </Select>
-        </FormControl>
-
-        {/* If Online selected */}
-        {paymentMode === 'Online' && (
-          <Box
-            p={2}
-            border='1px solid'
-            borderColor='primary.main'
-            borderRadius={2}
-            bgcolor='blue.50'
-          >
-            <Typography variant='subtitle1' fontWeight='bold' color='primary'>
-              💳 Online Payment Instructions:
-            </Typography>
-            <Typography variant='body2' mb={1}>
-              Please send payment to UPI ID: <b>fastfood@upi</b>
-            </Typography>
-            <TextField
-              label='Transaction ID'
-              variant='outlined'
-              fullWidth
-              value={txnId}
-              onChange={e => setTxnId(e.target.value)}
-              required
-            />
-          </Box>
-        )}
-
-        {/* Submit */}
+      <Box textAlign='center' mt={4}>
         <Button
-          type='submit'
           variant='contained'
-          disabled={orders.length === 0}
+          color='primary'
           size='large'
-          className='flex gap-3 items-center h-12'
+          onClick={handleSubmit}
+          startIcon={<Send />}
+          fullWidth
+          className='!h-12'
+          disabled={loading}
         >
-          <ShoppingBag size={20} /> <span> Place Order</span>
+          Place Order
         </Button>
       </Box>
-    </Paper>
+    </div>
   )
 }

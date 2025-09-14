@@ -1,43 +1,53 @@
-import nodemailer from 'nodemailer'
-import fs from 'fs'
+import { NextResponse } from 'next/server'
+import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
 import { v4 as uuidv4 } from 'uuid'
+import nodemailer from 'nodemailer'
 
 export async function POST (req: Request) {
   try {
-    const body = await req.json()
+    const form = await req.formData()
+
+    const name = form.get('name') as string
+    const phone = form.get('phone') as string
+    const email = form.get('email') as string
+    const address = form.get('address') as string
+    const orders = JSON.parse(form.get('orders') as string)
+    const totalAmount = parseFloat(form.get('totalAmount') as string)
+    const paymentMode = form.get('paymentMode') as string
+    const txnId = form.get('txnId') as string
+
+    let screenshotPath: string | null = null
+    let screenshotFileName: string | null = null
+
+    const screenshot = form.get('screenshot') as File | null
+    console.log(screenshot, 'screenshot')
+    if (screenshot) {
+      // Convert File to buffer safely on server
+      const arrayBuffer =
+        (await screenshot.arrayBuffer?.()) ||
+        (await screenshot
+          .stream()
+          .getReader()
+          .read()
+          .then(r => r.value))
+      const buffer = Buffer.from(arrayBuffer)
+
+      const uploadDir = path.join(process.cwd(), 'app', 'uploads')
+      await mkdir(uploadDir, { recursive: true })
+
+      const fileName = `${uuidv4()}-${screenshot.name}`
+      const filePath = path.join(uploadDir, fileName)
+
+      await writeFile(filePath, buffer)
+
+      screenshotPath = filePath
+      screenshotFileName = screenshot.name
+    }
+
     const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`
-    const filePath = path.join('/tmp', 'orders.json')
 
-
-    // 1️⃣ Read existing orders if file exists
-    let orders: any[] = []
-    if (fs.existsSync(filePath)) {
-      const fileData = fs.readFileSync(filePath, 'utf-8')
-      orders = JSON.parse(fileData)
-    }
-
-    // 2️⃣ Prepare new order
-    const newOrder = {
-      orderId,
-      name: body.name,
-      phone: body.phone,
-      email: body.email,
-      address: body.address,
-      paymentMode: body.paymentMode,
-      txnId: body.paymentMode === 'Online' ? body.txnId : '',
-      items: body.orders.map(
-        (i: any) => `${i.name} × ${i.quantity} — ₹${i.total}`
-      ),
-      total: body.total,
-      date: new Date().toLocaleString()
-    }
-
-    // 3️⃣ Append new order and save JSON
-    orders.push(newOrder)
-    fs.writeFileSync(filePath, JSON.stringify(orders, null, 2), 'utf-8')
-
-    // 4️⃣ Mail setup
+    // ✅ Mail setup
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -46,70 +56,62 @@ export async function POST (req: Request) {
       }
     })
 
-    // 5️⃣ Prepare mail for customer
-    const mailOptionsCustomer = {
+    // ✅ Admin Mail
+    const mailOptionsAdmin: any = {
       from: `"Fast Food Shop" <${process.env.SMTP_USER}>`,
-      to: body.email,
-      subject: `✅ Your Order Placed - ${orderId}`,
+      to: process.env.ADMIN_EMAIL,
+      subject: `🍔 New Order Received - ${orderId}`,
       html: `
-        <h2>Thank you for your order, ${body.name}!</h2>
-        <p>Your order ID is <b>${orderId}</b></p>
-        <ul>
-          ${body.orders
-            .map((i: any) => `<li>${i.name} × ${i.quantity} — ₹${i.total}</li>`)
-            .join('')}
-        </ul>
-        <p><b>Total:</b> ₹${body.total}</p>
-        <p>Payment Mode: ${body.paymentMode}</p>
-        ${
-          body.paymentMode === 'Online'
-            ? `<p><b>Transaction ID:</b> ${body.txnId}</p>`
-            : ''
-        }
-        <p>We are preparing your order and will notify you once it’s ready!</p>
-      `
-    }
-
-    // 6️⃣ Prepare mail for admin
-    const mailOptionsAdmin = {
-      from: `"Fast Food Shop" <${process.env.SMTP_USER}>`,
-      to: process.env.ADMIN_EMAIL, // your admin email
-      subject: `🌯 New Order Received - ${orderId}`,
-      html: `
-        <h2>New Order Received</h2>
+        <h3>New Order Received</h3>
         <p><b>Order ID:</b> ${orderId}</p>
-        <p><b>Customer Name:</b> ${body.name}</p>
-        <p><b>Phone:</b> ${body.phone}</p>
-        <p><b>Email:</b> ${body.email}</p>
-        <p><b>Address:</b> ${body.address}</p>
-        <p><b>Payment Mode:</b> ${body.paymentMode}</p>
-        ${
-          body.paymentMode === 'Online'
-            ? `<p><b>Txn ID:</b> ${body.txnId}</p>`
-            : ''
-        }
-        <h3>🛒 Order Items</h3>
-        <ul>
-          ${body.orders
-            .map((i: any) => `<li>${i.name} × ${i.quantity} — ₹${i.total}</li>`)
-            .join('')}
-        </ul>
-        <p><b>Total:</b> ₹${body.total}</p>
-      `
+        <p><b>Name:</b> ${name}</p>
+        <p><b>Phone:</b> ${phone}</p>
+        <p><b>Email:</b> ${email}</p>
+        <p><b>Address:</b> ${address}</p>
+        <p><b>Payment Mode:</b> ${paymentMode}</p>
+        <p><b>Txn ID:</b> ${txnId || '-'}</p>
+        <p><b>Items:</b><br/>${orders
+          .map((i: any) => `${i.name} × ${i.quantity} — ₹${i.total}`)
+          .join('<br/>')}</p>
+        <p><b>Total:</b> ₹${totalAmount}</p>
+      `,
+      attachments: []
     }
 
-    // 7️⃣ Send both emails
-    await transporter.sendMail(mailOptionsCustomer)
+    if (screenshotPath) {
+      mailOptionsAdmin.attachments.push({
+        filename: screenshotFileName || 'screenshot.jpg',
+        path: screenshotPath
+      })
+    }
+
     await transporter.sendMail(mailOptionsAdmin)
 
-    return new Response(
-      JSON.stringify({ success: true, message: 'JSON updated & mails sent!' }),
-      { status: 200 }
-    )
+    // ✅ Customer Mail
+    await transporter.sendMail({
+      from: `"Fast Food Shop" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: `✅ Order Confirmation - ${orderId}`,
+      html: `
+        <h3>Thank you, ${name}!</h3>
+        <p>Your order has been placed successfully.</p>
+        <p><b>Order ID:</b> ${orderId}</p>
+        <p><b>Items:</b><br/>${orders
+          .map((i: any) => `${i.name} × ${i.quantity} — ₹${i.total}`)
+          .join('<br/>')}</p>
+        <p><b>Total:</b> ₹${totalAmount}</p>
+        <p>We will deliver your order soon 🚀</p>
+      `
+    })
+
+    return NextResponse.json({
+      success: true,
+      orderId
+    })
   } catch (error: any) {
     console.error('❌ Error:', error)
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+    return NextResponse.json(
+      { success: false, error: error.message },
       { status: 500 }
     )
   }
