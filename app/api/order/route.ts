@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
+import { writeFile, mkdir, readFile } from 'fs/promises'
 import path from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import nodemailer from 'nodemailer'
@@ -17,13 +17,12 @@ export async function POST (req: Request) {
     const paymentMode = form.get('paymentMode') as string
     const txnId = form.get('txnId') as string
 
-    let screenshotPath: string | null = null
+    let screenshotPathTmp: string | null = null
+    let screenshotPathRoot: string | null = null
     let screenshotFileName: string | null = null
 
     const screenshot = form.get('screenshot') as File | null
-    console.log(screenshot, 'screenshot')
     if (screenshot) {
-      // Convert File to buffer safely on server
       const arrayBuffer =
         (await screenshot.arrayBuffer?.()) ||
         (await screenshot
@@ -33,19 +32,74 @@ export async function POST (req: Request) {
           .then(r => r.value))
       const buffer = Buffer.from(arrayBuffer)
 
-      const uploadDir = path.join(process.cwd(), 'app', 'uploads')
-      await mkdir(uploadDir, { recursive: true })
+      // ✅ Save screenshot in /tmp (serverless safe)
+      const tmpUploadDir = path.join('/tmp', 'uploads')
+      await mkdir(tmpUploadDir, { recursive: true })
+      const tmpFileName = `${uuidv4()}-${screenshot.name}`
+      screenshotPathTmp = path.join(tmpUploadDir, tmpFileName)
+      await writeFile(screenshotPathTmp, buffer)
 
-      const fileName = `${uuidv4()}-${screenshot.name}`
-      const filePath = path.join(uploadDir, fileName)
+      // ✅ Save screenshot in app/uploads (local/root safe)
+      const rootUploadDir = path.join(process.cwd(), 'app', 'uploads')
+      await mkdir(rootUploadDir, { recursive: true })
+      const rootFileName = `${uuidv4()}-${screenshot.name}`
+      screenshotPathRoot = path.join(rootUploadDir, rootFileName)
+      await writeFile(screenshotPathRoot, buffer)
 
-      await writeFile(filePath, buffer)
-
-      screenshotPath = filePath
       screenshotFileName = screenshot.name
     }
 
     const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`
+
+    // ✅ Paths for orders.json
+    const tmpOrdersPath = path.join('/tmp', 'orders.json') // serverless safe
+    const rootOrdersPath = path.join(process.cwd(), 'orders.json') // local/project root
+
+    // Read existing orders from tmp
+    let existingOrders: any[] = []
+    try {
+      const fileData = await readFile(tmpOrdersPath, 'utf-8')
+      existingOrders = JSON.parse(fileData)
+    } catch {
+      existingOrders = []
+    }
+
+    const newOrder = {
+      orderId,
+      name,
+      phone,
+      email,
+      address,
+      paymentMode,
+      txnId: txnId || '-',
+      items: orders.map((i: any) => `${i.name} × ${i.quantity} — ₹${i.total}`),
+      total: totalAmount,
+      date: new Date().toLocaleString('en-IN', { hour12: true }),
+      screenshotPath: screenshotPathRoot
+    }
+
+    existingOrders.push(newOrder)
+
+    // ✅ Write orders.json to tmp
+    await writeFile(
+      tmpOrdersPath,
+      JSON.stringify(existingOrders, null, 2),
+      'utf-8'
+    )
+
+    // ✅ Write orders.json to root
+    try {
+      await writeFile(
+        rootOrdersPath,
+        JSON.stringify(existingOrders, null, 2),
+        'utf-8'
+      )
+    } catch (err) {
+      console.warn(
+        '⚠️ Could not write to root orders.json (likely read-only in serverless)',
+        err
+      )
+    }
 
     // ✅ Mail setup
     const transporter = nodemailer.createTransport({
@@ -56,7 +110,7 @@ export async function POST (req: Request) {
       }
     })
 
-    // ✅ Admin Mail
+    // Admin Mail
     const mailOptionsAdmin: any = {
       from: `"Fast Food Shop" <${process.env.SMTP_USER}>`,
       to: process.env.ADMIN_EMAIL,
@@ -78,16 +132,16 @@ export async function POST (req: Request) {
       attachments: []
     }
 
-    if (screenshotPath) {
+    if (screenshotPathTmp) {
       mailOptionsAdmin.attachments.push({
         filename: screenshotFileName || 'screenshot.jpg',
-        path: screenshotPath
+        path: screenshotPathTmp // always use tmp path for mail attachments
       })
     }
 
     await transporter.sendMail(mailOptionsAdmin)
 
-    // ✅ Customer Mail
+    // Customer Mail
     await transporter.sendMail({
       from: `"Fast Food Shop" <${process.env.SMTP_USER}>`,
       to: email,
@@ -104,10 +158,7 @@ export async function POST (req: Request) {
       `
     })
 
-    return NextResponse.json({
-      success: true,
-      orderId
-    })
+    return NextResponse.json({ success: true, orderId })
   } catch (error: any) {
     console.error('❌ Error:', error)
     return NextResponse.json(
