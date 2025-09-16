@@ -64,7 +64,7 @@ export async function GET () {
     })
 
     await transporter.sendMail({
-      from: `"Fast Food Shop" <${process.env.SMTP_USER}>`,
+      from: `"MamuJaan" <${process.env.SMTP_USER}>`,
       to: process.env.ADMIN_EMAIL,
       subject: '📊 Weekly Orders Report',
       html: summaryHtml,

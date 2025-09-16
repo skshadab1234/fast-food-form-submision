@@ -112,7 +112,7 @@ export async function POST (req: Request) {
 
     // Admin Mail
     const mailOptionsAdmin: any = {
-      from: `"Fast Food Shop" <${process.env.SMTP_USER}>`,
+      from: `"MamuJaan" <${process.env.SMTP_USER}>`,
       to: process.env.ADMIN_EMAIL,
       subject: `🍔 New Order Received - ${orderId}`,
       html: `
@@ -143,7 +143,7 @@ export async function POST (req: Request) {
 
     // Customer Mail
     await transporter.sendMail({
-      from: `"Fast Food Shop" <${process.env.SMTP_USER}>`,
+      from: `"MamuJaan" <${process.env.SMTP_USER}>`,
       to: email,
       subject: `✅ Order Confirmation - ${orderId}`,
       html: `
