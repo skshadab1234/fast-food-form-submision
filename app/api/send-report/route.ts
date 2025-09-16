@@ -34,7 +34,7 @@ export async function GET () {
     })
 
     const summaryHtml = `
-      <h2>📊 Weekly Order Report</h2>
+      <h2>📊 Daily Order Report</h2>
       <p><b>Total Orders:</b> ${totalOrders}</p>
       <p><b>Total Revenue:</b> ₹${totalRevenue}</p>
       <h3>Top Items:</h3>
@@ -66,7 +66,7 @@ export async function GET () {
     await transporter.sendMail({
       from: `"MamuJaan" <${process.env.SMTP_USER}>`,
       to: process.env.ADMIN_EMAIL,
-      subject: '📊 Weekly Orders Report',
+      subject: '📊 Daily Orders Report',
       html: summaryHtml,
       attachments: [
         {
@@ -76,7 +76,7 @@ export async function GET () {
       ]
     })
 
-    console.log('✅ Weekly report sent successfully')
+    console.log('✅ Daily report sent successfully')
     return NextResponse.json({
       success: true,
       message: 'Report sent successfully',
